@@ -1,12 +1,10 @@
-package arpscan
+package config
 
 import (
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
-	"strconv"
 )
 
 type ArpScanConfig struct {
@@ -16,23 +14,7 @@ type ArpScanConfig struct {
 	TimeoutSec  int
 }
 
-func getEnv(key, defaultVal string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return defaultVal
-}
-
-func getEnvAsInt(name string, defaultVal int) int {
-	if value, exists := os.LookupEnv(name); exists {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
-		}
-	}
-	return defaultVal
-}
-
-func getFromEnv() ArpScanConfig {
+func GetArpScanConfig() ArpScanConfig {
 	bin := getEnv("ARP_SCAN_BIN", "arp-scan")
 	iface := getEnv("ARP_SCAN_IFACE", "eno1")
 	interval := getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60)
@@ -46,7 +28,7 @@ func getFromEnv() ArpScanConfig {
 	}
 }
 
-func ValidateConfig(config ArpScanConfig) error {
+func ValidateArpScanConfig(config ArpScanConfig) error {
 	if err := checkBin(config.Bin); err != nil {
 		return err
 	}

@@ -35,6 +35,22 @@ func getBot() *messaging_api.MessagingApiAPI {
 	return _bot
 }
 
+func SendMessage(to string, message string) error {
+	bot := getBot()
+
+	_, err := bot.PushMessage(
+		&messaging_api.PushMessageRequest{
+			To: to,
+			Messages: []messaging_api.MessageInterface{
+				messaging_api.TextMessageV2{Text: message},
+			},
+		},
+		"", // x-line-retry-key
+	)
+
+	return err
+}
+
 func OnCallback(writer http.ResponseWriter, request *http.Request) {
 	channelSecret, ok := os.LookupEnv("LINE_BOT_CHANNEL_SECRET")
 	if !ok {

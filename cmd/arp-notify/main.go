@@ -1,13 +1,11 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
-	"github.com/nekogravitycat/arp-notify/internal/arpscan"
 	"github.com/nekogravitycat/arp-notify/internal/linebot"
 )
 
@@ -16,8 +14,6 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-
-	go arpscan.PeriodicScan(context.Background())
 
 	http.HandleFunc("/callback", linebot.OnCallback)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
