@@ -45,6 +45,8 @@ func loadMonitorConfig() (*MonitorConfig, error) {
 			// File does not exist, create an empty config file.
 			if err := createEmptyMonitorConfig(); err != nil {
 				return nil, fmt.Errorf("failed to create empty config file %q: %w", filePath, err)
+			} else {
+				log.Printf("Created empty config file %q. Please populate it and restart the application.", filePath)
 			}
 		}
 		return nil, fmt.Errorf("failed to open file %q: %w", filePath, err)
@@ -64,7 +66,13 @@ func loadMonitorConfig() (*MonitorConfig, error) {
 
 func createEmptyMonitorConfig() error {
 	emptyCfg := MonitorConfig{
-		Targets: []TargetInfo{},
+		Targets: []TargetInfo{
+			{
+				Mac:       "",
+				Message:   "",
+				Receivers: []string{""},
+			},
+		},
 	}
 
 	outFile, err := os.Create(filePath)

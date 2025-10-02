@@ -11,7 +11,7 @@ import (
 	"github.com/nekogravitycat/arp-notify/internal/linebot"
 )
 
-func PeriodicScan(ctx context.Context) {
+func StartPeriodicScan(ctx context.Context) {
 	cfg := config.GetArpScanConfig()
 
 	// Validate config before starting.

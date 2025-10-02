@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/nekogravitycat/arp-notify/internal/config"
 	"github.com/nekogravitycat/arp-notify/internal/linebot"
 	"github.com/nekogravitycat/arp-notify/internal/monitor"
 )
@@ -17,7 +18,9 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	monitor.PeriodicScan(context.Background())
+	config.GetMonitorConfig() // Load and validate monitor config early to avoid issues later.
+
+	monitor.StartPeriodicScan(context.Background())
 
 	http.HandleFunc("/callback", linebot.OnCallback)
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
