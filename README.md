@@ -39,12 +39,21 @@ Create a file named `monitor_targets.json`. Example:
       "receivers": [
         "Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"
       ]
+    },
+    {
+      "mac": "e0:0f:52:1b:b9:59",
+      "ip": "192.168.0.2",
+      "message": "With optional IP address.",
+      "receivers": [
+        "Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"
+      ]
     }
   ]
 }
 ```
 
 * `mac`: The MAC address of the device to monitor.
+* `ip`: Optional IP address to probe when a broadcast ARP scan fails.
 * `message`: The notification message to send when the device is detected.
 * `receivers`: A list of LINE user IDs to receive the message.
 
