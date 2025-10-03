@@ -60,7 +60,7 @@ Create a `.env` file with the following:
 #### Optional (with defaults)
 
 * `ARP_SCAN_BIN = "arp-scan"`
-* `ARP_SCAN_IFACE = "eno1"`
+* `ARP_SCAN_IFACE = ""`
 * `ARP_SCAN_INTERVAL_SECS = "60"`
 * `ARP_SCAN_TIMEOUT_SECS = "15"`
 * `MONITOR_ABSENCE_RESET_MIN = "1440"`

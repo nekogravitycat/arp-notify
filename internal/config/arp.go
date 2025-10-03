@@ -20,7 +20,7 @@ var _arpConfig *ArpScanConfig
 func loadArpScanConfig() (ArpScanConfig, error) {
 	_arpConfig = &ArpScanConfig{
 		Bin:         getEnv("ARP_SCAN_BIN", "arp-scan"),
-		Iface:       getEnv("ARP_SCAN_IFACE", "eno1"),
+		Iface:       getEnv("ARP_SCAN_IFACE", ""),
 		IntervalSec: getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60),
 		TimeoutSec:  getEnvAsInt("ARP_SCAN_TIMEOUT_SECS", 15),
 	}

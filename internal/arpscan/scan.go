@@ -9,7 +9,11 @@ import (
 func RunArpScan(ctx context.Context, bin string, iface string) (string, error) {
 	// Construct full path and args (no shell).
 	// -q and -x makes parsing easier (no header/footer, minimal output)
-	args := []string{"-I", iface, "-l", "-q", "-x"}
+	args := []string{"-l", "-q", "-x"}
+
+	if iface != "" {
+		args = append([]string{"-I", iface}, args...)
+	}
 
 	// Create command with context (to enforce timeout/cancellation).
 	cmd := exec.CommandContext(ctx, bin, args...)
