@@ -18,7 +18,7 @@ func StartPeriodicScan(ctx context.Context) {
 	// Binary semaphore to allow only one scan at a time.
 	semaphore := make(chan struct{}, 1)
 
-	ticker := time.NewTicker(time.Duration(cfg.TimeoutSec) * time.Second)
+	ticker := time.NewTicker(time.Duration(cfg.IntervalSec) * time.Second)
 	defer ticker.Stop()
 
 	tryRun := func() {

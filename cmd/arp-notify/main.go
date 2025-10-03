@@ -19,7 +19,7 @@ func main() {
 		log.Fatalf("Failed to load configs: %v", err)
 	}
 
-	monitor.StartPeriodicScan(context.Background())
+	go monitor.StartPeriodicScan(context.Background())
 
 	linebot.StartLinebotServer()
 }
