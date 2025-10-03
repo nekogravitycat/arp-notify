@@ -33,18 +33,18 @@ type MonitorConfig struct {
 
 var _monitorConfig *MonitorConfig
 
-func LoadMonitorConfig() error {
+func loadMonitorConfig() (MonitorConfig, error) {
 	targets, err := loadTargetsFromFile()
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// File does not exist, create an empty config file.
 			if err := createEmptyMonitorTargets(); err != nil {
-				return fmt.Errorf("failed to create empty config file %q: %w", filePath, err)
+				return MonitorConfig{}, fmt.Errorf("failed to create empty config file %q: %w", filePath, err)
 			} else {
-				return fmt.Errorf("created empty config file %q. please populate it and restart the application", filePath)
+				return MonitorConfig{}, fmt.Errorf("created empty config file %q. please populate it and restart the application", filePath)
 			}
 		}
-		return fmt.Errorf("failed to open monitor target file %q: %w", filePath, err)
+		return MonitorConfig{}, fmt.Errorf("failed to open monitor target file %q: %w", filePath, err)
 	}
 
 	absenceResetMin := getEnvAsInt("MONITOR_ABSENCE_RESET_MIN", 1440) // Default to 24 hours
@@ -54,7 +54,7 @@ func LoadMonitorConfig() error {
 		AbsenceResetMin: absenceResetMin,
 	}
 
-	return nil
+	return *_monitorConfig, nil
 }
 
 func GetMonitorConfig() MonitorConfig {

@@ -8,7 +8,7 @@ import (
 
 // StartLinebotServer initializes and starts the HTTP server for handling LINE bot callbacks and health checks.
 func StartLinebotServer() {
-	http.HandleFunc("/callback", OnCallback)
+	http.HandleFunc("/callback", onCallback)
 	http.HandleFunc("/health", onHealthCheck)
 
 	port, ok := os.LookupEnv("PORT")

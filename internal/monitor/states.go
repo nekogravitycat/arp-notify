@@ -22,6 +22,8 @@ func markNotified(mac string) {
 	}
 }
 
+// updateStateAndShouldNotify updates the state for the given MAC address
+// and returns true if a notification should be sent.
 func updateStateAndShouldNotify(mac string) bool {
 	cfg := config.GetMonitorConfig()
 

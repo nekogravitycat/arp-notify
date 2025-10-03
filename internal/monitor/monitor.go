@@ -11,7 +11,7 @@ import (
 	"github.com/nekogravitycat/arp-notify/internal/linebot"
 )
 
-// StartPeriodicScan starts a goroutine that runs arp-scan periodically.
+// StartPeriodicScan runs arp-scan periodically.
 func StartPeriodicScan(ctx context.Context) {
 	cfg := config.GetArpScanConfig()
 
@@ -59,9 +59,9 @@ func StartPeriodicScan(ctx context.Context) {
 }
 
 func handleOutput(output string) {
-	config := config.GetMonitorConfig()
+	cfg := config.GetMonitorConfig()
 
-	for mac, info := range config.Targets {
+	for mac, info := range cfg.Targets {
 		if !strings.Contains(output, mac) {
 			continue
 		}
@@ -76,7 +76,6 @@ func handleOutput(output string) {
 		log.Printf("Sending notification for MAC %s.", mac)
 		// Notify receivers
 		sendNotification(info.Receivers, info.Message)
-
 		// Mark as notified
 		markNotified(mac)
 	}

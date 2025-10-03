@@ -6,13 +6,19 @@ import (
 	"strconv"
 )
 
-func LoadConfigs() error {
-	if err := LoadArpScanConfig(); err != nil {
+func Load() error {
+	if cfg, err := loadArpScanConfig(); err != nil {
 		return fmt.Errorf("failed to load arp-scan config: %w", err)
+	} else {
+		fmt.Printf("Using arp-scan config: %+v\n", cfg)
 	}
-	if err := LoadMonitorConfig(); err != nil {
+
+	if cfg, err := loadMonitorConfig(); err != nil {
 		return fmt.Errorf("failed to load monitor config: %w", err)
+	} else {
+		fmt.Printf("Using monitor config: %+v\n", cfg)
 	}
+
 	return nil
 }
 

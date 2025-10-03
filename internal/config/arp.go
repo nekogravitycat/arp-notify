@@ -17,7 +17,7 @@ type ArpScanConfig struct {
 
 var _arpConfig *ArpScanConfig
 
-func LoadArpScanConfig() error {
+func loadArpScanConfig() (ArpScanConfig, error) {
 	_arpConfig = &ArpScanConfig{
 		Bin:         getEnv("ARP_SCAN_BIN", "arp-scan"),
 		Iface:       getEnv("ARP_SCAN_IFACE", "eno1"),
@@ -25,7 +25,11 @@ func LoadArpScanConfig() error {
 		TimeoutSec:  getEnvAsInt("ARP_SCAN_TIMEOUT_SECS", 15),
 	}
 
-	return validateArpScanConfig(_arpConfig)
+	if err := validateArpScanConfig(_arpConfig); err != nil {
+		return ArpScanConfig{}, err
+	}
+
+	return *_arpConfig, nil
 }
 
 func GetArpScanConfig() ArpScanConfig {

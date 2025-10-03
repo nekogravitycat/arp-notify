@@ -51,7 +51,7 @@ func SendMessage(to string, message string) error {
 	return err
 }
 
-func OnCallback(writer http.ResponseWriter, request *http.Request) {
+func onCallback(writer http.ResponseWriter, request *http.Request) {
 	channelSecret, ok := os.LookupEnv("LINE_BOT_CHANNEL_SECRET")
 	if !ok {
 		log.Fatal("LINE_BOT_CHANNEL_SECRET not set")
