@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-var filePath = "monitor_config.json"
+var filePath = "monitor_targets.json"
 
 type MonitorTargetsFile struct {
 	Targets []MonitorTarget `json:"targets"`

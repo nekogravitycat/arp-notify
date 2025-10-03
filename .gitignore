@@ -1,5 +1,5 @@
 .env
-monitor_config.json
+monitor_targets.json
 
 # Binaries for programs and plugins
 *.exe
