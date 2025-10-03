@@ -46,7 +46,7 @@ func LoadMonitorConfig() error {
 		return fmt.Errorf("failed to open monitor target file %q: %w", filePath, err)
 	}
 
-	absenceResetMin := getEnvAsInt("MONITOR_ABSENCE_RESET_MIN", 60)
+	absenceResetMin := getEnvAsInt("MONITOR_ABSENCE_RESET_MIN", 1440) // Default to 24 hours
 
 	_monitorConfig = &MonitorConfig{
 		Targets:         targets,
