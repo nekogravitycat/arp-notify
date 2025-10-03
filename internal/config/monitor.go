@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 var filePath = "monitor_targets.json"
@@ -83,7 +84,7 @@ func loadTargetsFromFile() (map[string]TargetInfo, error) {
 
 	targets := make(map[string]TargetInfo)
 	for _, entry := range cfg.Targets {
-		targets[entry.Mac] = TargetInfo{
+		targets[strings.ToLower(entry.Mac)] = TargetInfo{
 			Message:   entry.Message,
 			Receivers: entry.Receivers,
 		}
