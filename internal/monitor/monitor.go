@@ -11,13 +11,9 @@ import (
 	"github.com/nekogravitycat/arp-notify/internal/linebot"
 )
 
+// StartPeriodicScan starts a goroutine that runs arp-scan periodically.
 func StartPeriodicScan(ctx context.Context) {
 	cfg := config.GetArpScanConfig()
-
-	// Validate config before starting.
-	if err := config.ValidateArpScanConfig(cfg); err != nil {
-		log.Fatalf("Invalid configuration: %v", err)
-	}
 
 	// Binary semaphore to allow only one scan at a time.
 	semaphore := make(chan struct{}, 1)
@@ -63,18 +59,35 @@ func StartPeriodicScan(ctx context.Context) {
 }
 
 func handleOutput(output string) {
-	cfg := config.GetMonitorConfig()
+	config := config.GetMonitorConfig()
 
-	for _, target := range cfg.Targets {
-		if strings.Contains(output, target.Mac) {
-			log.Printf("Detected target MAC %s, sending notifications.", target.Mac)
-			for _, receiver := range target.Receivers {
-				if err := linebot.SendMessage(receiver, target.Message); err != nil {
-					log.Printf("Error sending notification to %s: %v", receiver, err)
-				} else {
-					log.Printf("Notification sent to %s", receiver)
-				}
-			}
+	for mac, info := range config.Targets {
+		if !strings.Contains(output, mac) {
+			continue
+		}
+
+		log.Printf("Target MAC %s found in scan output.", mac)
+
+		if !updateStateAndShouldNotify(mac) {
+			log.Printf("Already notified for MAC %s, skipping notification.", mac)
+			continue
+		}
+
+		log.Printf("Sending notification for MAC %s.", mac)
+		// Notify receivers
+		sendNotification(info.Receivers, info.Message)
+
+		// Mark as notified
+		markNotified(mac)
+	}
+}
+
+func sendNotification(receivers []string, message string) {
+	for _, receiver := range receivers {
+		if err := linebot.SendMessage(receiver, message); err != nil {
+			log.Printf("Error sending notification to %s: %v", receiver, err)
+		} else {
+			log.Printf("Notification sent to %s", receiver)
 		}
 	}
 }

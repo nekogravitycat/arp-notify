@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os/exec"
 	"regexp"
 )
@@ -14,21 +15,27 @@ type ArpScanConfig struct {
 	TimeoutSec  int
 }
 
-func GetArpScanConfig() ArpScanConfig {
-	bin := getEnv("ARP_SCAN_BIN", "arp-scan")
-	iface := getEnv("ARP_SCAN_IFACE", "eno1")
-	interval := getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60)
-	timeout := getEnvAsInt("ARP_SCAN_TIMEOUT_SECS", 15)
+var _arpConfig *ArpScanConfig
 
-	return ArpScanConfig{
-		Bin:         bin,
-		Iface:       iface,
-		IntervalSec: interval,
-		TimeoutSec:  timeout,
+func LoadArpScanConfig() error {
+	_arpConfig = &ArpScanConfig{
+		Bin:         getEnv("ARP_SCAN_BIN", "arp-scan"),
+		Iface:       getEnv("ARP_SCAN_IFACE", "eno1"),
+		IntervalSec: getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60),
+		TimeoutSec:  getEnvAsInt("ARP_SCAN_TIMEOUT_SECS", 15),
 	}
+
+	return validateArpScanConfig(_arpConfig)
 }
 
-func ValidateArpScanConfig(config ArpScanConfig) error {
+func GetArpScanConfig() ArpScanConfig {
+	if _arpConfig == nil {
+		log.Fatal("ArpScanConfig not loaded. Call LoadArpScanConfig() first.")
+	}
+	return *_arpConfig
+}
+
+func validateArpScanConfig(config *ArpScanConfig) error {
 	if err := checkBin(config.Bin); err != nil {
 		return err
 	}
