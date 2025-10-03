@@ -1,6 +1,7 @@
-# ARP Scanner Go Tool
+# ARP Notify
 
-This is a simple Go-based ARP scanner to detect devices on your local network.
+A small Go tool that monitors devices on your local Wi-Fi/LAN by scanning for their MAC addresses using `arp-scan`.
+When a target device is detected, it sends a notification via LINE Bot.
 
 ## Requirements
 
@@ -9,23 +10,66 @@ This is a simple Go-based ARP scanner to detect devices on your local network.
 ```bash
 sudo apt update
 sudo apt install arp-scan
-```
+````
 
-2. Check the full path to `arp-scan`:
-
-```bash
-which arp-scan
-```
-
-3. Grant the necessary capability to run without `sudo`:
+2. Grant the required capability so `arp-scan` can run without `sudo`:
 
 ```bash
 sudo setcap cap_net_raw+ep /usr/sbin/arp-scan
 ```
 
-> Replace `/usr/sbin/arp-scan` with the path obtained from `which arp-scan` if different.
+## Build
 
-## Notes
+```bash
+go build -o arp-notify ./cmd/arp-notify/main.go
+```
 
-- This is **not the final version**; it is a simple proof-of-concept.
-- Make sure your network interface is correct when running the scanner.
+## Configuration
+
+### Target Monitoring File
+
+Create a file named `monitor_targets.json`. Example:
+
+```json
+{
+  "targets": [
+    {
+      "mac": "e0:0f:52:1b:b9:59",
+      "message": "A random mac address and a random receiver!",
+      "receivers": [
+        "Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"
+      ]
+    }
+  ]
+}
+```
+
+* `mac`: The MAC address of the device to monitor.
+* `message`: The notification message to send when the device is detected.
+* `receivers`: A list of LINE user IDs to receive the message.
+
+### Environment Variables (`.env`)
+
+Create a `.env` file with the following:
+
+#### Required
+
+* `LINE_BOT_CHANNEL_ACCESS_TOKEN`
+* `LINE_BOT_CHANNEL_SECRET`
+
+#### Optional (with defaults)
+
+* `ARP_SCAN_BIN = "arp-scan"`
+* `ARP_SCAN_IFACE = "eno1"`
+* `ARP_SCAN_INTERVAL_SECS = "60"`
+* `ARP_SCAN_TIMEOUT_SECS = "15"`
+* `MONITOR_ABSENCE_RESET_MIN = "1440"`
+
+
+## Run
+
+```bash
+./arp-notify
+```
+
+The program will periodically run `arp-scan` to detect target devices and send LINE Bot notifications when matches are found.
