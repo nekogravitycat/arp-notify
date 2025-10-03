@@ -17,11 +17,13 @@ type MonitorTargetsFile struct {
 
 type MonitorTarget struct {
 	Mac       string   `json:"mac"`
+	Ip        *string  `json:"ip,omitempty"`
 	Message   string   `json:"message"`
 	Receivers []string `json:"receivers"`
 }
 
 type TargetInfo struct {
+	Ip        *string
 	Message   string
 	Receivers []string
 }
@@ -85,6 +87,7 @@ func loadTargetsFromFile() (map[string]TargetInfo, error) {
 	targets := make(map[string]TargetInfo)
 	for _, entry := range cfg.Targets {
 		targets[strings.ToLower(entry.Mac)] = TargetInfo{
+			Ip:        entry.Ip,
 			Message:   entry.Message,
 			Receivers: entry.Receivers,
 		}
@@ -98,6 +101,7 @@ func createEmptyMonitorTargets() error {
 		Targets: []MonitorTarget{
 			{
 				Mac:       "",
+				Ip:        nil,
 				Message:   "",
 				Receivers: []string{},
 			},

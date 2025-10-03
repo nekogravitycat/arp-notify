@@ -58,26 +58,63 @@ func StartPeriodicScan(ctx context.Context) {
 	}
 }
 
+// handleOutput processes the output of boardcast arp-scan and checks for target MAC addresses.
 func handleOutput(output string) {
 	cfg := config.GetMonitorConfig()
 
 	for mac, info := range cfg.Targets {
-		if !strings.Contains(output, mac) {
-			continue
+		if strings.Contains(output, mac) {
+			onFound(mac, info)
+		} else {
+			onBoardcastNotFound(mac, info)
 		}
+	}
+}
 
-		log.Printf("Target MAC %s found in scan output.", mac)
+// onFound handles the event when a target MAC is found in a scan.
+func onFound(mac string, info config.TargetInfo) {
+	log.Printf("Target MAC %s found in scan output.", mac)
 
-		if !updateStateAndShouldNotify(mac) {
-			log.Printf("Already notified for MAC %s, skipping notification.", mac)
-			continue
-		}
+	if !updateStateAndShouldNotify(mac) {
+		log.Printf("Already notified for MAC %s, skipping notification.", mac)
+		return
+	}
 
-		log.Printf("Sending notification for MAC %s.", mac)
-		// Notify receivers
-		sendNotification(info.Receivers, info.Message)
-		// Mark as notified
-		markNotified(mac)
+	log.Printf("Sending notification for MAC %s.", mac)
+	// Notify receivers
+	sendNotification(info.Receivers, info.Message)
+	// Mark as notified
+	markNotified(mac)
+}
+
+// onBoardcastNotFound performs an individual scan for the target IP if provided.
+func onBoardcastNotFound(mac string, info config.TargetInfo) {
+	log.Printf("Target MAC %s NOT found in scan output.", mac)
+
+	if info.Ip != nil && *info.Ip != "" {
+		log.Printf("Performing individual scan for IP %s of MAC %s.", *info.Ip, mac)
+		individualScan(*info.Ip, mac, info)
+	}
+}
+
+// individualScan performs an individual arp-scan for the given IP and checks for the MAC address.
+func individualScan(ip string, mac string, info config.TargetInfo) {
+	cfg := config.GetArpScanConfig()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	output, err := arpscan.RunArpScanOnIp(ctx, cfg.Bin, cfg.Iface, ip)
+	if err != nil {
+		log.Printf("Error running individual arp-scan on IP %s: %v", ip, err)
+		return
+	}
+
+	log.Printf("Individual arp-scan output for IP %s:\n%s", ip, output)
+
+	if strings.Contains(output, mac) {
+		onFound(mac, info)
+		return
 	}
 }
 
