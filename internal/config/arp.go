@@ -23,7 +23,7 @@ func loadArpScanConfig() (ArpScanConfig, error) {
 		Bin:                  getEnv("ARP_SCAN_BIN", "arp-scan"),
 		Iface:                getEnv("ARP_SCAN_IFACE", ""),
 		IntervalSec:          getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60),
-		BroadcastTimeoutSec:  getEnvAsInt("ARP_SCAN_TIMEOUT_SECS", 15),
+		BroadcastTimeoutSec:  getEnvAsInt("ARP_SCAN_BROADCAST_TIMEOUT_SECS", 15),
 		IndividualTimeoutSec: getEnvAsInt("ARP_SCAN_INDIVIDUAL_TIMEOUT_SECS", 2),
 	}
 
