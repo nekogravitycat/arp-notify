@@ -114,10 +114,10 @@ func individualScan(targets []config.Target) {
 			continue
 		}
 
-		log.Printf("Running individual scan for MAC %s with IP %v", info.Mac, info.Ip)
+		log.Printf("Running individual scan for MAC %s with IP %s", info.Mac, *info.Ip)
 		output, err := arpscan.RunArpScanOnIp(ctx, arpCfg.Bin, arpCfg.Iface, *info.Ip)
 		if err != nil {
-			log.Printf("Error running individual arp-scan for IP %v: %v", *info.Ip, err)
+			log.Printf("Error running individual arp-scan for IP %s: %v", *info.Ip, err)
 			continue
 		}
 
@@ -125,7 +125,7 @@ func individualScan(targets []config.Target) {
 		if strings.Contains(output, info.Mac) {
 			onFound(info)
 		} else {
-			log.Printf("MAC %s not found in individual scan for IP %v", info.Mac, *info.Ip)
+			log.Printf("MAC %s not found in individual scan for IP %s", info.Mac, *info.Ip)
 		}
 	}
 }
