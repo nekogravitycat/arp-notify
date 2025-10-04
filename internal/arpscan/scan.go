@@ -37,3 +37,17 @@ func RunArpScanOnIp(ctx context.Context, bin string, iface string, ip string) (s
 
 	return string(out), err
 }
+
+func RunArpScanOnIps(ctx context.Context, bin string, iface string, ips []string) (string, error) {
+	output := ""
+
+	for _, ip := range ips {
+		out, err := RunArpScanOnIp(ctx, bin, iface, ip)
+		if err != nil {
+			return output, err
+		}
+		output += "\n" + string(out)
+	}
+
+	return output, nil
+}

@@ -13,12 +13,13 @@ import (
 
 // StartPeriodicScan runs arp-scan periodically.
 func StartPeriodicScan(ctx context.Context) {
-	cfg := config.GetArpScanConfig()
+	arpCfg := config.GetArpScanConfig()
+	targets := config.GetMonitorConfig().Targets
 
 	// Binary semaphore to allow only one scan at a time.
 	semaphore := make(chan struct{}, 1)
 
-	ticker := time.NewTicker(time.Duration(cfg.IntervalSec) * time.Second)
+	ticker := time.NewTicker(time.Duration(arpCfg.IntervalSec) * time.Second)
 	defer ticker.Stop()
 
 	tryRun := func() {
@@ -27,17 +28,12 @@ func StartPeriodicScan(ctx context.Context) {
 			// Acquired semaphore, run scan.
 			defer func() { <-semaphore }() // Release semaphore when done.
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.TimeoutSec)*time.Second)
-			defer cancel()
-
-			output, err := arpscan.RunArpScan(ctx, cfg.Bin, cfg.Iface)
-			if err != nil {
-				log.Printf("Error running arp-scan: %v", err)
-				return
+			if allTargetsHaveIPs(targets) {
+				individualScan(targets)
+			} else {
+				broadcastScan(targets)
 			}
 
-			log.Printf("arp-scan output:\n%s", output)
-			go handleOutput(output)
 		default:
 			// Semaphore not acquired, scan already running.
 			log.Println("Scan already in progress, skipping this interval.")
@@ -58,64 +54,98 @@ func StartPeriodicScan(ctx context.Context) {
 	}
 }
 
-// handleOutput processes the output of boardcast arp-scan and checks for target MAC addresses.
-func handleOutput(output string) {
-	cfg := config.GetMonitorConfig()
+func allTargetsHaveIPs(targets []config.Target) bool {
+	for _, target := range targets {
+		if target.Ip == nil || *target.Ip == "" {
+			return false
+		}
+	}
+	return true
+}
 
-	for mac, info := range cfg.Targets {
-		if strings.Contains(output, mac) {
-			onFound(mac, info)
+// broadcastScan performs a broadcast arp-scan and processes the output.
+func broadcastScan(targets []config.Target) {
+	// Run broadcast arp-scan
+	log.Println("Starting broadcast arp-scan...")
+
+	arpCfg := config.GetArpScanConfig()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(arpCfg.TimeoutSec)*time.Second)
+	defer cancel()
+
+	output, err := arpscan.RunArpScan(ctx, arpCfg.Bin, arpCfg.Iface)
+	if err != nil {
+		log.Printf("Error running arp-scan: %v", err)
+		return
+	}
+
+	// Handle broadcast output
+	notfoundHasIp := []config.Target{}
+
+	for _, info := range targets {
+		if strings.Contains(output, info.Mac) {
+			// MAC found in broadcast scan
+			onFound(info)
+		} else if info.Ip != nil && *info.Ip != "" {
+			// Schedule individual scan for this target
+			log.Printf("MAC %s not found in broadcast scan, scheduling individual scan.", info.Mac)
+			notfoundHasIp = append(notfoundHasIp, info)
+		}
+	}
+
+	// Perform individual scans for targets not found in broadcast scan
+	if len(notfoundHasIp) != 0 {
+		individualScan(notfoundHasIp)
+	}
+}
+
+// individualScan performs an individual arp-scan for each target with a specified IP.
+func individualScan(targets []config.Target) {
+	// Run individual arp-scan for each target with specified IP
+	log.Println("Starting individual arp-scan for specified IPs...")
+
+	arpCfg := config.GetArpScanConfig()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(arpCfg.TimeoutSec)*time.Second)
+	defer cancel()
+
+	// Iterate over targets and run individual scans
+	for _, info := range targets {
+		if info.Ip == nil || *info.Ip == "" {
+			log.Printf("Skipping MAC %s as no IP is specified.", info.Mac)
+			continue
+		}
+
+		log.Printf("Running individual scan for MAC %s with IP %v", info.Mac, info.Ip)
+		output, err := arpscan.RunArpScanOnIp(ctx, arpCfg.Bin, arpCfg.Iface, *info.Ip)
+		if err != nil {
+			log.Printf("Error running individual arp-scan for IP %v: %v", *info.Ip, err)
+			continue
+		}
+
+		// Handle individual scan output
+		if strings.Contains(output, info.Mac) {
+			onFound(info)
 		} else {
-			onBoardcastNotFound(mac, info)
+			log.Printf("MAC %s not found in individual scan for IP %v", info.Mac, *info.Ip)
 		}
 	}
 }
 
 // onFound handles the event when a target MAC is found in a scan.
-func onFound(mac string, info config.TargetInfo) {
-	log.Printf("Target MAC %s found in scan output.", mac)
+func onFound(target config.Target) {
+	log.Printf("Target MAC %s found in scan output.", target.Mac)
 
-	if !updateStateAndShouldNotify(mac) {
-		log.Printf("Already notified for MAC %s, skipping notification.", mac)
+	if !updateStateAndShouldNotify(target.Mac) {
+		log.Printf("Already notified for MAC %s, skipping notification.", target.Mac)
 		return
 	}
 
-	log.Printf("Sending notification for MAC %s.", mac)
-	// Notify receivers
-	sendNotification(info.Receivers, info.Message)
+	log.Printf("Sending notification for MAC %s.", target.Mac)
+
 	// Mark as notified
-	markNotified(mac)
-}
+	markNotified(target.Mac)
 
-// onBoardcastNotFound performs an individual scan for the target IP if provided.
-func onBoardcastNotFound(mac string, info config.TargetInfo) {
-	log.Printf("Target MAC %s NOT found in scan output.", mac)
-
-	if info.Ip != nil && *info.Ip != "" {
-		log.Printf("Performing individual scan for IP %s of MAC %s.", *info.Ip, mac)
-		individualScan(*info.Ip, mac, info)
-	}
-}
-
-// individualScan performs an individual arp-scan for the given IP and checks for the MAC address.
-func individualScan(ip string, mac string, info config.TargetInfo) {
-	cfg := config.GetArpScanConfig()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	output, err := arpscan.RunArpScanOnIp(ctx, cfg.Bin, cfg.Iface, ip)
-	if err != nil {
-		log.Printf("Error running individual arp-scan on IP %s: %v", ip, err)
-		return
-	}
-
-	log.Printf("Individual arp-scan output for IP %s:\n%s", ip, output)
-
-	if strings.Contains(output, mac) {
-		onFound(mac, info)
-		return
-	}
+	// Send notification asynchronously
+	go sendNotification(target.Receivers, target.Message)
 }
 
 func sendNotification(receivers []string, message string) {

@@ -6,31 +6,24 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 )
 
 var filePath = "monitor_targets.json"
 
-type MonitorTargetsFile struct {
-	Targets []MonitorTarget `json:"targets"`
+type TargetsFile struct {
+	Targets []Target `json:"targets"`
 }
 
-type MonitorTarget struct {
+type Target struct {
 	Mac       string   `json:"mac"`
 	Ip        *string  `json:"ip,omitempty"`
 	Message   string   `json:"message"`
 	Receivers []string `json:"receivers"`
 }
 
-type TargetInfo struct {
-	Ip        *string
-	Message   string
-	Receivers []string
-}
-
 type MonitorConfig struct {
-	Targets         map[string]TargetInfo // Keyed by MAC address
-	AbsenceResetMin int                   // Minutes after which absence notification resets
+	Targets         []Target
+	AbsenceResetMin int
 }
 
 var _monitorConfig *MonitorConfig
@@ -40,7 +33,7 @@ func loadMonitorConfig() (MonitorConfig, error) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// File does not exist, create an empty config file.
-			if err := createEmptyMonitorTargets(); err != nil {
+			if err := createEmptyTargetsFile(); err != nil {
 				return MonitorConfig{}, fmt.Errorf("failed to create empty config file %q: %w", filePath, err)
 			} else {
 				return MonitorConfig{}, fmt.Errorf("created empty config file %q. please populate it and restart the application", filePath)
@@ -66,7 +59,7 @@ func GetMonitorConfig() MonitorConfig {
 	return *_monitorConfig
 }
 
-func loadTargetsFromFile() (map[string]TargetInfo, error) {
+func loadTargetsFromFile() ([]Target, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -79,26 +72,17 @@ func loadTargetsFromFile() (map[string]TargetInfo, error) {
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 
-	var cfg MonitorTargetsFile
+	var cfg TargetsFile
 	if err := decoder.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to decode JSON: %w", err)
 	}
 
-	targets := make(map[string]TargetInfo)
-	for _, entry := range cfg.Targets {
-		targets[strings.ToLower(entry.Mac)] = TargetInfo{
-			Ip:        entry.Ip,
-			Message:   entry.Message,
-			Receivers: entry.Receivers,
-		}
-	}
-
-	return targets, nil
+	return cfg.Targets, nil
 }
 
-func createEmptyMonitorTargets() error {
-	emptyCfg := MonitorTargetsFile{
-		Targets: []MonitorTarget{
+func createEmptyTargetsFile() error {
+	emptyCfg := TargetsFile{
+		Targets: []Target{
 			{
 				Mac:       "",
 				Ip:        nil,
