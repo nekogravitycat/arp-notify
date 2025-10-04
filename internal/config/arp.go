@@ -9,20 +9,22 @@ import (
 )
 
 type ArpScanConfig struct {
-	Bin         string
-	Iface       string
-	IntervalSec int
-	TimeoutSec  int
+	Bin                  string
+	Iface                string
+	IntervalSec          int
+	BroadcastTimeoutSec  int
+	IndividualTimeoutSec int
 }
 
 var _arpConfig *ArpScanConfig
 
 func loadArpScanConfig() (ArpScanConfig, error) {
 	_arpConfig = &ArpScanConfig{
-		Bin:         getEnv("ARP_SCAN_BIN", "arp-scan"),
-		Iface:       getEnv("ARP_SCAN_IFACE", ""),
-		IntervalSec: getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60),
-		TimeoutSec:  getEnvAsInt("ARP_SCAN_TIMEOUT_SECS", 15),
+		Bin:                  getEnv("ARP_SCAN_BIN", "arp-scan"),
+		Iface:                getEnv("ARP_SCAN_IFACE", ""),
+		IntervalSec:          getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60),
+		BroadcastTimeoutSec:  getEnvAsInt("ARP_SCAN_TIMEOUT_SECS", 15),
+		IndividualTimeoutSec: getEnvAsInt("ARP_SCAN_INDIVIDUAL_TIMEOUT_SECS", 2),
 	}
 
 	if err := validateArpScanConfig(_arpConfig); err != nil {
@@ -49,8 +51,11 @@ func validateArpScanConfig(config *ArpScanConfig) error {
 	if config.IntervalSec <= 0 {
 		return errors.New("invalid interval (must be > 0)")
 	}
-	if config.TimeoutSec <= 0 {
-		return errors.New("invalid timeout (must be > 0)")
+	if config.BroadcastTimeoutSec <= 0 {
+		return errors.New("invalid broadcast timeout (must be > 0)")
+	}
+	if config.IndividualTimeoutSec <= 0 {
+		return errors.New("invalid individual timeout (must be > 0)")
 	}
 	return nil
 }
