@@ -1,0 +1,15 @@
+[Unit]
+Description=ARP Notify Service
+After=network.target
+
+[Service]
+Type=simple
+User=<YOUR_USER>
+WorkingDirectory=<PATH_TO_PROJECT>
+ExecStart=<PATH_TO_PROJECT>/arp-notify
+Restart=always
+RestartSec=5
+# Note: The application loads .env from the working directory automatically.
+
+[Install]
+WantedBy=multi-user.target

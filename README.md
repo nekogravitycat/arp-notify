@@ -10,7 +10,7 @@ When a target device is detected, it sends a notification via LINE Bot.
 ```bash
 sudo apt update
 sudo apt install arp-scan
-````
+```
 
 2. Grant the required capability so `arp-scan` can run without `sudo`:
 
@@ -36,26 +36,22 @@ Create a file named `monitor_targets.json`. Example:
     {
       "mac": "e0:0f:52:1b:b9:59",
       "message": "A random mac address and a random receiver!",
-      "receivers": [
-        "Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"
-      ]
+      "receivers": ["Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"]
     },
     {
       "mac": "e0:0f:52:1b:b9:59",
       "ip": "192.168.0.2",
       "message": "With optional IP address.",
-      "receivers": [
-        "Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"
-      ]
+      "receivers": ["Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"]
     }
   ]
 }
 ```
 
-* `mac`: The MAC address of the device to monitor.
-* `ip`: Optional IP address to probe when a broadcast ARP scan fails.
-* `message`: The notification message to send when the device is detected.
-* `receivers`: A list of LINE user IDs to receive the message.
+- `mac`: The MAC address of the device to monitor.
+- `ip`: Optional IP address to probe when a broadcast ARP scan fails.
+- `message`: The notification message to send when the device is detected.
+- `receivers`: A list of LINE user IDs to receive the message.
 
 ### Environment Variables (`.env`)
 
@@ -63,18 +59,17 @@ Create a `.env` file with the following:
 
 #### Required
 
-* `LINE_BOT_CHANNEL_ACCESS_TOKEN`
-* `LINE_BOT_CHANNEL_SECRET`
+- `LINE_BOT_CHANNEL_ACCESS_TOKEN`
+- `LINE_BOT_CHANNEL_SECRET`
 
 #### Optional (with defaults)
 
-* `ARP_SCAN_BIN = "arp-scan"`
-* `ARP_SCAN_IFACE = ""`
-* `ARP_SCAN_INTERVAL_SECS = "60"`
-* `ARP_SCAN_BROADCAST_TIMEOUT_SECS = "15"`
-* `ARP_SCAN_INDIVIDUAL_TIMEOUT_SECS = "2"`
-* `MONITOR_ABSENCE_RESET_MIN = "1440"`
-
+- `ARP_SCAN_BIN = "arp-scan"`
+- `ARP_SCAN_IFACE = ""`
+- `ARP_SCAN_INTERVAL_SECS = "60"`
+- `ARP_SCAN_BROADCAST_TIMEOUT_SECS = "15"`
+- `ARP_SCAN_INDIVIDUAL_TIMEOUT_SECS = "2"`
+- `MONITOR_ABSENCE_RESET_MIN = "1440"`
 
 ## Run
 
@@ -83,3 +78,20 @@ Create a `.env` file with the following:
 ```
 
 The program will periodically run `arp-scan` to detect target devices and send LINE Bot notifications when matches are found.
+
+## Autostart on Linux (systemd)
+
+A systemd service file `arp-notify.service` is included in the repository. To use it:
+
+1.  **Edit the service file**:
+    Open `arp-notify.service` and replace `<YOUR_USER>` with your username and `<PATH_TO_PROJECT>` with the absolute path to your `arp-notify` directory.
+2.  **Install the service**:
+    ```bash
+    sudo cp arp-notify.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now arp-notify
+    ```
+3.  **Check status**:
+    ```bash
+    sudo systemctl status arp-notify
+    ```
