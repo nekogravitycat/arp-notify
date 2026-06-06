@@ -7,30 +7,32 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>arp-notify</h1>
-    <span class="sub">Device presence detection &amp; LINE notification settings</span>
-  </header>
+  <div class="sticky-top">
+    <header>
+      <h1>arp-notify</h1>
+      <span class="sub">Device presence detection &amp; LINE notification settings</span>
+    </header>
 
-  <nav class="tabs">
-    <button data-tab="targets" class="active">Targets</button>
-    <button data-tab="system">System</button>
-    <button data-tab="status">Status</button>
-  </nav>
+    <nav class="tabs">
+      <button data-tab="targets" class="active">Targets</button>
+      <button data-tab="system">System</button>
+      <button data-tab="status">Status</button>
+    </nav>
+  </div>
 
   <main>
     <!-- Targets -->
     <section id="view-targets" class="view active">
+      <div class="card">
+        <label for="default-message">Default notification message</label>
+        <textarea id="default-message" placeholder="Welcome home!"></textarea>
+        <div class="hint">Used when neither the target nor the receiver sets a message.</div>
+      </div>
       <div id="targets-list"></div>
       <div class="toolbar">
         <button class="btn secondary" id="add-target">+ Add target</button>
         <button class="btn" id="save-targets">Save targets</button>
         <span class="hint">Changes take effect immediately, no restart needed.</span>
-      </div>
-      <div class="card">
-        <label for="default-message">Default notification message</label>
-        <textarea id="default-message" placeholder="Welcome home!"></textarea>
-        <div class="hint">Used when neither the target nor the receiver sets a message.</div>
       </div>
     </section>
 
