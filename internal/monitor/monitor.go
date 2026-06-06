@@ -33,6 +33,15 @@ func StartPeriodicScan(ctx context.Context) {
 		}
 	}
 
+	// applyInterval resets the ticker when the configured interval changes.
+	applyInterval := func() {
+		if newInterval := config.GetSystemConfig().ArpScan.IntervalSec; newInterval > 0 && newInterval != interval {
+			interval = newInterval
+			ticker.Reset(time.Duration(interval) * time.Second)
+			log.Printf("Scan interval updated to %d seconds.", interval)
+		}
+	}
+
 	// Initial run.
 	tryRun()
 
@@ -41,13 +50,11 @@ func StartPeriodicScan(ctx context.Context) {
 		case <-ctx.Done():
 			log.Println("Stopping periodic scan due to context cancellation.")
 			return
+		case <-config.SystemConfigChanged():
+			// React to a config save immediately rather than at the next tick.
+			applyInterval()
 		case <-ticker.C:
-			// Hot-reload the interval if it changed.
-			if newInterval := config.GetSystemConfig().ArpScan.IntervalSec; newInterval > 0 && newInterval != interval {
-				interval = newInterval
-				ticker.Reset(time.Duration(interval) * time.Second)
-				log.Printf("Scan interval updated to %d seconds.", interval)
-			}
+			applyInterval()
 			tryRun()
 		}
 	}
@@ -134,9 +141,19 @@ func runScanCycle() {
 	}
 }
 
-// containsMac reports whether the scan output contains the MAC (case-insensitive).
+// containsMac reports whether the scan output lists the MAC as a whole field
+// (case-insensitive). arp-scan's -x output is tab-separated (IP, MAC, vendor),
+// so matching whole fields avoids false positives from substrings.
 func containsMac(output, mac string) bool {
-	return strings.Contains(strings.ToLower(output), strings.ToLower(mac))
+	target := strings.ToLower(mac)
+	for line := range strings.SplitSeq(output, "\n") {
+		for field := range strings.FieldsSeq(line) {
+			if strings.ToLower(field) == target {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // onFound handles the event when a target MAC is found in a scan.
@@ -149,7 +166,6 @@ func onFound(target config.Target, defaultMessage string) {
 	}
 
 	log.Printf("Sending notification for MAC %s.", target.Mac)
-	markNotified(target.Mac)
 
 	// Send each receiver its resolved message asynchronously.
 	for _, r := range target.Receivers {

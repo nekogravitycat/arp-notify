@@ -15,30 +15,44 @@ import (
 var (
 	_bot     *messaging_api.MessagingApiAPI
 	_onceBot sync.Once
+	_botErr  error
 )
 
-func getBot() *messaging_api.MessagingApiAPI {
+// CheckEnv verifies the required LINE credentials are present. Call it once at
+// startup so missing configuration fails fast instead of crashing a request.
+func CheckEnv() error {
+	if _, ok := os.LookupEnv("LINE_BOT_CHANNEL_ACCESS_TOKEN"); !ok {
+		return errors.New("LINE_BOT_CHANNEL_ACCESS_TOKEN not set")
+	}
+	if _, ok := os.LookupEnv("LINE_BOT_CHANNEL_SECRET"); !ok {
+		return errors.New("LINE_BOT_CHANNEL_SECRET not set")
+	}
+	return nil
+}
+
+func getBot() (*messaging_api.MessagingApiAPI, error) {
 	channelAccessToken, ok := os.LookupEnv("LINE_BOT_CHANNEL_ACCESS_TOKEN")
 	if !ok {
-		log.Fatal("LINE_BOT_CHANNEL_ACCESS_TOKEN not set")
-		return nil
+		return nil, errors.New("LINE_BOT_CHANNEL_ACCESS_TOKEN not set")
 	}
 
 	_onceBot.Do(func() {
-		var err error
-		_bot, err = messaging_api.NewMessagingApiAPI(channelAccessToken)
-		if err != nil || _bot == nil {
-			log.Fatal("Error creating LINE bot client: ", err)
+		_bot, _botErr = messaging_api.NewMessagingApiAPI(channelAccessToken)
+		if _botErr == nil && _bot == nil {
+			_botErr = errors.New("failed to create LINE bot client")
 		}
 	})
 
-	return _bot
+	return _bot, _botErr
 }
 
 func SendMessage(to string, message string) error {
-	bot := getBot()
+	bot, err := getBot()
+	if err != nil {
+		return err
+	}
 
-	_, err := bot.PushMessage(
+	_, err = bot.PushMessage(
 		&messaging_api.PushMessageRequest{
 			To: to,
 			Messages: []messaging_api.MessageInterface{
@@ -54,8 +68,8 @@ func SendMessage(to string, message string) error {
 func onCallback(writer http.ResponseWriter, request *http.Request) {
 	channelSecret, ok := os.LookupEnv("LINE_BOT_CHANNEL_SECRET")
 	if !ok {
-		log.Fatal("LINE_BOT_CHANNEL_SECRET not set")
-		writer.WriteHeader(500)
+		log.Println("LINE_BOT_CHANNEL_SECRET not set")
+		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -90,8 +104,10 @@ func onMessageEvent(event webhook.MessageEvent) {
 	// Remember the user; fetch the LINE profile display name once.
 	recordSeenUser(userId, "")
 	if seenUserNeedsName(userId) {
-		if profile, err := getBot().GetProfile(userId); err == nil && profile != nil {
-			recordSeenUser(userId, profile.DisplayName)
+		if bot, err := getBot(); err == nil {
+			if profile, err := bot.GetProfile(userId); err == nil && profile != nil {
+				recordSeenUser(userId, profile.DisplayName)
+			}
 		}
 	}
 
@@ -103,7 +119,12 @@ func onMessageEvent(event webhook.MessageEvent) {
 		return
 	}
 
-	_, err := getBot().ReplyMessage(
+	bot, err := getBot()
+	if err != nil {
+		log.Printf("Cannot reply to %s: %v\n", userId, err)
+		return
+	}
+	_, err = bot.ReplyMessage(
 		&messaging_api.ReplyMessageRequest{
 			ReplyToken: event.ReplyToken,
 			Messages: []messaging_api.MessageInterface{

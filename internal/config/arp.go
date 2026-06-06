@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os/exec"
 	"regexp"
 )
@@ -27,7 +28,8 @@ type MonitorConfig struct {
 }
 
 type ServerConfig struct {
-	Port int `yaml:"port" json:"port"`
+	Host string `yaml:"host" json:"host"`
+	Port int    `yaml:"port" json:"port"`
 }
 
 // applySystemDefaults fills in sensible defaults for any zero-valued field so
@@ -47,6 +49,9 @@ func applySystemDefaults(cfg *SystemConfig) {
 	}
 	if cfg.Monitor.AbsenceResetMin == 0 {
 		cfg.Monitor.AbsenceResetMin = 1440 // 24 hours
+	}
+	if cfg.Server.Host == "" {
+		cfg.Server.Host = "127.0.0.1" // loopback only by default; set 0.0.0.0 to expose
 	}
 	if cfg.Server.Port == 0 {
 		cfg.Server.Port = 5000
@@ -71,6 +76,9 @@ func validateSystemConfig(cfg *SystemConfig) error {
 	}
 	if cfg.Monitor.AbsenceResetMin <= 0 {
 		return errors.New("monitor.absence_reset_min must be > 0")
+	}
+	if net.ParseIP(cfg.Server.Host) == nil {
+		return fmt.Errorf("server.host %q is not a valid IP address", cfg.Server.Host)
 	}
 	if cfg.Server.Port <= 0 || cfg.Server.Port > 65535 {
 		return errors.New("server.port must be between 1 and 65535")

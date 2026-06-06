@@ -226,6 +226,7 @@ async function loadSystem() {
     $("#sys-bcast").value = s.arp_scan.broadcast_timeout_sec;
     $("#sys-indiv").value = s.arp_scan.individual_timeout_sec;
     $("#sys-absence").value = s.monitor.absence_reset_min;
+    $("#sys-host").value = s.server.host || "127.0.0.1";
     $("#sys-port").value = s.server.port;
   } catch (e) { toast("Failed to load system settings: " + e.message, "error"); }
 }
@@ -240,7 +241,7 @@ async function saveSystem() {
       individual_timeout_sec: +$("#sys-indiv").value,
     },
     monitor: { absence_reset_min: +$("#sys-absence").value },
-    server: { port: +$("#sys-port").value },
+    server: { host: $("#sys-host").value, port: +$("#sys-port").value },
   };
   try {
     await api("PUT", "/api/system", body);

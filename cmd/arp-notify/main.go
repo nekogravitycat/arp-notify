@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/nekogravitycat/arp-notify/internal/config"
@@ -24,15 +26,28 @@ func main() {
 		log.Fatalf("Failed to load configs: %v", err)
 	}
 
+	if err := linebot.CheckEnv(); err != nil {
+		log.Fatalf("LINE bot configuration error: %v", err)
+	}
+
 	go monitor.StartPeriodicScan(context.Background())
 
 	mux := http.NewServeMux()
 	linebot.RegisterRoutes(mux)
 	web.RegisterRoutes(mux)
 
-	addr := fmt.Sprintf(":%d", config.GetSystemConfig().Server.Port)
+	srvCfg := config.GetSystemConfig().Server
+	addr := net.JoinHostPort(srvCfg.Host, fmt.Sprintf("%d", srvCfg.Port))
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	log.Printf("Starting server on %s (admin UI at /admin/)", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
 }

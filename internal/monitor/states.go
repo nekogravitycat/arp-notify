@@ -40,31 +40,22 @@ func Snapshot() []DeviceStatus {
 	return out
 }
 
-func markNotified(mac string) {
-	stateMu.Lock()
-	defer stateMu.Unlock()
-	if ds, exists := state[mac]; exists {
-		ds.notified = true
-		state[mac] = ds
-	}
-}
-
-// updateStateAndShouldNotify updates the state for the given MAC address
-// and returns true if a notification should be sent.
+// updateStateAndShouldNotify records a sighting of the given MAC and atomically
+// decides whether a notification should be sent. When it returns true it has
+// already marked the device as notified, so callers need no second step.
 func updateStateAndShouldNotify(mac string) bool {
 	cfg := config.GetSystemConfig()
 
 	stateMu.Lock()
 	defer stateMu.Unlock()
 
+	now := time.Now()
+
 	ds, exists := state[mac]
 	if !exists {
-		// First time seeing this MAC.
-		state[mac] = deviceState{
-			lastSeen: time.Now(),
-			notified: false,
-		}
-		return true // Notify on first sighting.
+		// First sighting: notify and mark as notified in one go.
+		state[mac] = deviceState{lastSeen: now, notified: true}
+		return true
 	}
 
 	// Reset notified status if last seen was long ago.
@@ -72,7 +63,11 @@ func updateStateAndShouldNotify(mac string) bool {
 		ds.notified = false
 	}
 
-	ds.lastSeen = time.Now()
+	shouldNotify := !ds.notified
+	ds.lastSeen = now
+	if shouldNotify {
+		ds.notified = true
+	}
 	state[mac] = ds
-	return !ds.notified
+	return shouldNotify
 }

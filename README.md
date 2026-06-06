@@ -52,6 +52,7 @@ arp_scan:
 monitor:
   absence_reset_min: 1440  # re-notify after a device has been absent this long (minutes)
 server:
+  host: "127.0.0.1"        # bind address; 127.0.0.1 = loopback only, 0.0.0.0 = all interfaces
   port: 5000               # HTTP port for the LINE webhook and the /admin UI
 ```
 
@@ -95,8 +96,9 @@ The service serves a configuration UI at `http://<host>:<port>/admin/` (default
 - adjust system settings.
 
 Changes are saved to the YAML files and take effect **immediately, without a restart** (a
-changed `server.port` is the one exception and needs a restart). The UI has **no
-authentication** — only expose the port on a trusted network.
+changed `server.host`/`server.port` is the one exception and needs a restart). The UI has **no
+authentication**, so it binds to `127.0.0.1` (loopback) by default. Set `server.host` to
+`0.0.0.0` only on a trusted network if you need to reach it from another machine.
 
 ### Finding a LINE user ID
 

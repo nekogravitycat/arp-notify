@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 )
 
@@ -76,6 +77,9 @@ func validateTargetsConfig(cfg *TargetsConfig) error {
 		case ModeIP, ModeAuto:
 			if t.Detection.IP == "" {
 				return fmt.Errorf("target %s: detection mode %q requires an ip", label, t.Detection.Mode)
+			}
+			if net.ParseIP(t.Detection.IP) == nil {
+				return fmt.Errorf("target %s: invalid ip %q", label, t.Detection.IP)
 			}
 		case ModeBroadcast:
 			// no IP required

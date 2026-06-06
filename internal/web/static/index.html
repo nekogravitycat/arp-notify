@@ -71,6 +71,16 @@
             <input type="number" id="sys-absence" min="1" />
             <div class="hint">After a device is absent longer than this, it notifies again when it reappears.</div>
           </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Bind address (host)</label>
+            <select id="sys-host">
+              <option value="127.0.0.1">Loopback only (127.0.0.1)</option>
+              <option value="0.0.0.0">All interfaces (0.0.0.0)</option>
+            </select>
+            <div class="hint">Loopback is safest. Use 0.0.0.0 only on a trusted network — the admin UI has no login. Requires a service restart.</div>
+          </div>
           <div class="col">
             <label>HTTP port</label>
             <input type="number" id="sys-port" min="1" max="65535" />

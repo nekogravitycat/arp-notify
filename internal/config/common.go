@@ -20,7 +20,25 @@ var (
 	mu        sync.RWMutex
 	systemCfg SystemConfig
 	targetCfg TargetsConfig
+
+	// systemChangedCh is signaled (non-blocking) whenever the system config is
+	// saved, so long-running consumers like the scan loop can react immediately
+	// instead of waiting for their next tick.
+	systemChangedCh = make(chan struct{}, 1)
 )
+
+// SystemConfigChanged returns a channel that receives a value each time the
+// system config is saved through SaveSystemConfig.
+func SystemConfigChanged() <-chan struct{} {
+	return systemChangedCh
+}
+
+func notifySystemChanged() {
+	select {
+	case systemChangedCh <- struct{}{}:
+	default: // a pending signal is already queued; coalesce.
+	}
+}
 
 // Load reads config.yaml and targets.yaml into the in-memory store. Missing
 // files are seeded with commented templates; a freshly-created targets.yaml
@@ -64,8 +82,8 @@ func Load() error {
 	targetCfg = targets
 	mu.Unlock()
 
-	fmt.Printf("Using system config: %+v\n", sys)
-	fmt.Printf("Using targets config: %+v\n", targets)
+	log.Printf("Using system config: %+v", sys)
+	log.Printf("Loaded targets config: %d target(s), %d contact(s).", len(targets.Targets), len(targets.Contacts))
 	return nil
 }
 
@@ -99,6 +117,7 @@ func SaveSystemConfig(cfg SystemConfig) error {
 	mu.Lock()
 	systemCfg = cfg
 	mu.Unlock()
+	notifySystemChanged()
 	return nil
 }
 
@@ -167,6 +186,7 @@ arp_scan:
 monitor:
   absence_reset_min: 1440  # re-notify after a device has been absent this long (minutes)
 server:
+  host: "127.0.0.1"        # bind address; 127.0.0.1 = loopback only, 0.0.0.0 = all interfaces
   port: 5000               # HTTP port for the LINE webhook and the /admin UI
 `
 
