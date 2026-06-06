@@ -11,31 +11,24 @@ import (
 	"github.com/nekogravitycat/arp-notify/internal/linebot"
 )
 
-// StartPeriodicScan runs arp-scan periodically.
+// StartPeriodicScan runs arp-scan periodically. Config (targets and interval)
+// is re-read on every cycle, so edits made through the web UI take effect
+// without a restart.
 func StartPeriodicScan(ctx context.Context) {
-	arpCfg := config.GetArpScanConfig()
-	targets := config.GetMonitorConfig().Targets
+	interval := config.GetSystemConfig().ArpScan.IntervalSec
+
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	defer ticker.Stop()
 
 	// Binary semaphore to allow only one scan at a time.
 	semaphore := make(chan struct{}, 1)
 
-	ticker := time.NewTicker(time.Duration(arpCfg.IntervalSec) * time.Second)
-	defer ticker.Stop()
-
 	tryRun := func() {
 		select {
 		case semaphore <- struct{}{}:
-			// Acquired semaphore, run scan.
-			defer func() { <-semaphore }() // Release semaphore when done.
-
-			if allTargetsHaveIPs(targets) {
-				individualScans(targets)
-			} else {
-				broadcastScan(targets)
-			}
-
+			defer func() { <-semaphore }()
+			runScanCycle()
 		default:
-			// Semaphore not acquired, scan already running.
 			log.Println("Scan already in progress, skipping this interval.")
 		}
 	}
@@ -49,91 +42,106 @@ func StartPeriodicScan(ctx context.Context) {
 			log.Println("Stopping periodic scan due to context cancellation.")
 			return
 		case <-ticker.C:
+			// Hot-reload the interval if it changed.
+			if newInterval := config.GetSystemConfig().ArpScan.IntervalSec; newInterval > 0 && newInterval != interval {
+				interval = newInterval
+				ticker.Reset(time.Duration(interval) * time.Second)
+				log.Printf("Scan interval updated to %d seconds.", interval)
+			}
 			tryRun()
 		}
 	}
 }
 
-func allTargetsHaveIPs(targets []config.Target) bool {
-	for _, target := range targets {
-		if target.Ip == nil || *target.Ip == "" {
-			return false
+// runScanCycle performs one detection pass honoring each target's detection mode.
+// At most one broadcast scan runs per cycle.
+func runScanCycle() {
+	arpCfg := config.GetSystemConfig().ArpScan
+	targetsCfg := config.GetTargetsConfig()
+
+	// Collect enabled targets.
+	active := make([]config.Target, 0, len(targetsCfg.Targets))
+	for _, t := range targetsCfg.Targets {
+		if t.Enabled {
+			active = append(active, t)
 		}
 	}
-	return true
-}
-
-// broadcastScan performs a broadcast arp-scan and processes the output.
-func broadcastScan(targets []config.Target) {
-	// Run broadcast arp-scan
-	log.Println("Starting broadcast arp-scan...")
-
-	arpCfg := config.GetArpScanConfig()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(arpCfg.BroadcastTimeoutSec)*time.Second)
-	defer cancel()
-
-	output, err := arpscan.RunArpScan(ctx, arpCfg.Bin, arpCfg.Iface)
-	if err != nil {
-		log.Printf("Error running arp-scan: %v", err)
+	if len(active) == 0 {
 		return
 	}
 
-	// Handle broadcast output
-	notfoundHasIp := []config.Target{}
+	found := make(map[string]bool) // mac -> found this cycle
 
-	for _, target := range targets {
-		if strings.Contains(output, target.Mac) {
-			// MAC found in broadcast scan
-			onFound(target)
-		} else if target.Ip != nil && *target.Ip != "" {
-			// Schedule individual scan for this target
-			log.Printf("MAC %s not found in broadcast scan, scheduling individual scan.", target.Mac)
-			notfoundHasIp = append(notfoundHasIp, target)
+	// 1. Individual pass for ip / auto targets.
+	for _, t := range active {
+		if t.Detection.Mode != config.ModeIP && t.Detection.Mode != config.ModeAuto {
+			continue
 		}
-	}
-
-	// Perform individual scans for targets not found in broadcast scan
-	if len(notfoundHasIp) != 0 {
-		individualScans(notfoundHasIp)
-	}
-}
-
-// individualScans performs an individual arp-scan for each target with a specified IP.
-func individualScans(targets []config.Target) {
-	// Run individual arp-scan for each target with specified IP
-	log.Println("Starting individual arp-scan for specified IPs...")
-
-	arpCfg := config.GetArpScanConfig()
-
-	// Iterate over targets and run individual scans
-	for _, target := range targets {
-		if target.Ip == nil || *target.Ip == "" {
-			log.Printf("Skipping MAC %s as no IP is specified.", target.Mac)
+		if t.Detection.IP == "" {
 			continue
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(arpCfg.IndividualTimeoutSec)*time.Second)
-		defer cancel()
-
-		log.Printf("Running individual scan for MAC %s with IP %s", target.Mac, *target.Ip)
-		output, err := arpscan.RunArpScanOnIp(ctx, arpCfg.Bin, arpCfg.Iface, *target.Ip)
+		log.Printf("Individual scan for %q (MAC %s, IP %s)", t.Name, t.Mac, t.Detection.IP)
+		output, err := arpscan.RunArpScanOnIp(ctx, arpCfg.Bin, arpCfg.Iface, t.Detection.IP)
+		cancel()
 		if err != nil {
-			log.Printf("Error running individual arp-scan for IP %s: %v", *target.Ip, err)
+			log.Printf("Error running individual arp-scan for IP %s: %v", t.Detection.IP, err)
 			continue
 		}
 
-		// Handle individual scan output
-		if strings.Contains(output, target.Mac) {
-			onFound(target)
+		if containsMac(output, t.Mac) {
+			found[t.Mac] = true
+			onFound(t, targetsCfg.DefaultMessage)
+		}
+	}
+
+	// 2. Broadcast pass for broadcast targets + auto targets not yet found.
+	needBroadcast := make([]config.Target, 0)
+	for _, t := range active {
+		switch t.Detection.Mode {
+		case config.ModeBroadcast:
+			needBroadcast = append(needBroadcast, t)
+		case config.ModeAuto:
+			if !found[t.Mac] {
+				needBroadcast = append(needBroadcast, t)
+			}
+		}
+	}
+	if len(needBroadcast) == 0 {
+		return
+	}
+
+	log.Println("Starting broadcast arp-scan...")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(arpCfg.BroadcastTimeoutSec)*time.Second)
+	output, err := arpscan.RunArpScan(ctx, arpCfg.Bin, arpCfg.Iface)
+	cancel()
+	if err != nil {
+		log.Printf("Error running broadcast arp-scan: %v", err)
+		return
+	}
+
+	for _, t := range needBroadcast {
+		if found[t.Mac] {
+			continue
+		}
+		if containsMac(output, t.Mac) {
+			found[t.Mac] = true
+			onFound(t, targetsCfg.DefaultMessage)
 		} else {
-			log.Printf("MAC %s not found in individual scan for IP %s", target.Mac, *target.Ip)
+			log.Printf("MAC %s (%q) not found.", t.Mac, t.Name)
 		}
 	}
 }
 
+// containsMac reports whether the scan output contains the MAC (case-insensitive).
+func containsMac(output, mac string) bool {
+	return strings.Contains(strings.ToLower(output), strings.ToLower(mac))
+}
+
 // onFound handles the event when a target MAC is found in a scan.
-func onFound(target config.Target) {
-	log.Printf("Target MAC %s found in scan output.", target.Mac)
+func onFound(target config.Target, defaultMessage string) {
+	log.Printf("Target %q (MAC %s) found in scan output.", target.Name, target.Mac)
 
 	if !updateStateAndShouldNotify(target.Mac) {
 		log.Printf("Already notified for MAC %s, skipping notification.", target.Mac)
@@ -141,20 +149,18 @@ func onFound(target config.Target) {
 	}
 
 	log.Printf("Sending notification for MAC %s.", target.Mac)
-
-	// Mark as notified
 	markNotified(target.Mac)
 
-	// Send notification asynchronously
-	go sendNotification(target.Receivers, target.Message)
+	// Send each receiver its resolved message asynchronously.
+	for _, r := range target.Receivers {
+		go sendNotification(r.ID, target.MessageFor(r, defaultMessage))
+	}
 }
 
-func sendNotification(receivers []string, message string) {
-	for _, receiver := range receivers {
-		if err := linebot.SendMessage(receiver, message); err != nil {
-			log.Printf("Error sending notification to %s: %v", receiver, err)
-		} else {
-			log.Printf("Notification sent to %s", receiver)
-		}
+func sendNotification(receiverID, message string) {
+	if err := linebot.SendMessage(receiverID, message); err != nil {
+		log.Printf("Error sending notification to %s: %v", receiverID, err)
+	} else {
+		log.Printf("Notification sent to %s", receiverID)
 	}
 }

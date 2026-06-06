@@ -3,74 +3,95 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os/exec"
 	"regexp"
 )
 
+// SystemConfig holds the system / scan behavior loaded from config.yaml.
+type SystemConfig struct {
+	ArpScan ArpScanConfig `yaml:"arp_scan" json:"arp_scan"`
+	Monitor MonitorConfig `yaml:"monitor" json:"monitor"`
+	Server  ServerConfig  `yaml:"server" json:"server"`
+}
+
 type ArpScanConfig struct {
-	Bin                  string
-	Iface                string
-	IntervalSec          int
-	BroadcastTimeoutSec  int
-	IndividualTimeoutSec int
+	Bin                  string `yaml:"bin" json:"bin"`
+	Iface                string `yaml:"iface" json:"iface"`
+	IntervalSec          int    `yaml:"interval_sec" json:"interval_sec"`
+	BroadcastTimeoutSec  int    `yaml:"broadcast_timeout_sec" json:"broadcast_timeout_sec"`
+	IndividualTimeoutSec int    `yaml:"individual_timeout_sec" json:"individual_timeout_sec"`
 }
 
-var _arpConfig *ArpScanConfig
-
-func loadArpScanConfig() (ArpScanConfig, error) {
-	_arpConfig = &ArpScanConfig{
-		Bin:                  getEnv("ARP_SCAN_BIN", "arp-scan"),
-		Iface:                getEnv("ARP_SCAN_IFACE", ""),
-		IntervalSec:          getEnvAsInt("ARP_SCAN_INTERVAL_SECS", 60),
-		BroadcastTimeoutSec:  getEnvAsInt("ARP_SCAN_BROADCAST_TIMEOUT_SECS", 15),
-		IndividualTimeoutSec: getEnvAsInt("ARP_SCAN_INDIVIDUAL_TIMEOUT_SECS", 2),
-	}
-
-	if err := validateArpScanConfig(_arpConfig); err != nil {
-		return ArpScanConfig{}, err
-	}
-
-	return *_arpConfig, nil
+type MonitorConfig struct {
+	AbsenceResetMin int `yaml:"absence_reset_min" json:"absence_reset_min"`
 }
 
-func GetArpScanConfig() ArpScanConfig {
-	if _arpConfig == nil {
-		log.Fatal("ArpScanConfig not loaded. Call LoadArpScanConfig() first.")
-	}
-	return *_arpConfig
+type ServerConfig struct {
+	Port int `yaml:"port" json:"port"`
 }
 
-func validateArpScanConfig(config *ArpScanConfig) error {
-	if err := checkBin(config.Bin); err != nil {
+// applySystemDefaults fills in sensible defaults for any zero-valued field so
+// partially-specified config files still work.
+func applySystemDefaults(cfg *SystemConfig) {
+	if cfg.ArpScan.Bin == "" {
+		cfg.ArpScan.Bin = "arp-scan"
+	}
+	if cfg.ArpScan.IntervalSec == 0 {
+		cfg.ArpScan.IntervalSec = 60
+	}
+	if cfg.ArpScan.BroadcastTimeoutSec == 0 {
+		cfg.ArpScan.BroadcastTimeoutSec = 15
+	}
+	if cfg.ArpScan.IndividualTimeoutSec == 0 {
+		cfg.ArpScan.IndividualTimeoutSec = 2
+	}
+	if cfg.Monitor.AbsenceResetMin == 0 {
+		cfg.Monitor.AbsenceResetMin = 1440 // 24 hours
+	}
+	if cfg.Server.Port == 0 {
+		cfg.Server.Port = 5000
+	}
+}
+
+func validateSystemConfig(cfg *SystemConfig) error {
+	if err := checkBin(cfg.ArpScan.Bin); err != nil {
 		return err
 	}
-	if err := validateIface(config.Iface); err != nil {
+	if err := validateIface(cfg.ArpScan.Iface); err != nil {
 		return err
 	}
-	if config.IntervalSec <= 0 {
-		return errors.New("invalid interval (must be > 0)")
+	if cfg.ArpScan.IntervalSec <= 0 {
+		return errors.New("arp_scan.interval_sec must be > 0")
 	}
-	if config.BroadcastTimeoutSec <= 0 {
-		return errors.New("invalid broadcast timeout (must be > 0)")
+	if cfg.ArpScan.BroadcastTimeoutSec <= 0 {
+		return errors.New("arp_scan.broadcast_timeout_sec must be > 0")
 	}
-	if config.IndividualTimeoutSec <= 0 {
-		return errors.New("invalid individual timeout (must be > 0)")
+	if cfg.ArpScan.IndividualTimeoutSec <= 0 {
+		return errors.New("arp_scan.individual_timeout_sec must be > 0")
+	}
+	if cfg.Monitor.AbsenceResetMin <= 0 {
+		return errors.New("monitor.absence_reset_min must be > 0")
+	}
+	if cfg.Server.Port <= 0 || cfg.Server.Port > 65535 {
+		return errors.New("server.port must be between 1 and 65535")
 	}
 	return nil
 }
 
-// CheckBin checks if the arp-scan binary is available in PATH.
+// checkBin checks if the arp-scan binary is available in PATH.
 func checkBin(bin string) error {
-	_, err := exec.LookPath(bin)
-	if err != nil {
+	if _, err := exec.LookPath(bin); err != nil {
 		return fmt.Errorf("binary %q not found in PATH: %w", bin, err)
 	}
 	return nil
 }
 
-// ValidateIface the interface name (alphanumeric, punctuation allowed limited).
+// validateIface validates the interface name. An empty name is allowed and
+// means "all interfaces".
 func validateIface(iface string) error {
+	if iface == "" {
+		return nil
+	}
 	re := regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9._-]{0,15}$`)
 	if !re.MatchString(iface) {
 		return errors.New("invalid interface name")

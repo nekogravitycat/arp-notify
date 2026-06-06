@@ -78,23 +78,30 @@ func onCallback(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-// Send user's ID when receiving a text message "whoami" from a user
+// onMessageEvent records the sender (for the web UI's receiver picker) and,
+// when the text is "whoami", replies with the user's ID.
 func onMessageEvent(event webhook.MessageEvent) {
-	message, ok := event.Message.(webhook.TextMessageContent)
-	if !ok {
-		return
-	}
-
-	if message.Text != "whoami" {
-		return
-	}
-
 	source, ok := event.Source.(webhook.UserSource)
 	if !ok {
 		return
 	}
-
 	userId := source.UserId
+
+	// Remember the user; fetch the LINE profile display name once.
+	recordSeenUser(userId, "")
+	if seenUserNeedsName(userId) {
+		if profile, err := getBot().GetProfile(userId); err == nil && profile != nil {
+			recordSeenUser(userId, profile.DisplayName)
+		}
+	}
+
+	message, ok := event.Message.(webhook.TextMessageContent)
+	if !ok {
+		return
+	}
+	if message.Text != "whoami" {
+		return
+	}
 
 	_, err := getBot().ReplyMessage(
 		&messaging_api.ReplyMessageRequest{

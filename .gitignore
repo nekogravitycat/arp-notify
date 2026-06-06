@@ -1,5 +1,7 @@
 .env
 monitor_targets.json
+config.yaml
+targets.yaml
 
 # Binaries for programs and plugins
 *.exe

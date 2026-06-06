@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>arp-notify settings</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>arp-notify</h1>
+    <span class="sub">Device presence detection &amp; LINE notification settings</span>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="targets" class="active">Targets</button>
+    <button data-tab="system">System</button>
+    <button data-tab="status">Status</button>
+  </nav>
+
+  <main>
+    <!-- Targets -->
+    <section id="view-targets" class="view active">
+      <div id="targets-list"></div>
+      <div class="toolbar">
+        <button class="btn secondary" id="add-target">+ Add target</button>
+        <button class="btn" id="save-targets">Save targets</button>
+        <span class="hint">Changes take effect immediately, no restart needed.</span>
+      </div>
+      <div class="card">
+        <label for="default-message">Default notification message</label>
+        <textarea id="default-message" placeholder="Welcome home!"></textarea>
+        <div class="hint">Used when neither the target nor the receiver sets a message.</div>
+      </div>
+    </section>
+
+    <!-- System -->
+    <section id="view-system" class="view">
+      <div class="card">
+        <div class="card-head"><span class="title">arp-scan</span></div>
+        <div class="row">
+          <div class="col">
+            <label>Binary (bin)</label>
+            <input type="text" id="sys-bin" />
+          </div>
+          <div class="col">
+            <label>Interface (iface, empty = all)</label>
+            <input type="text" id="sys-iface" placeholder="eth0" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <label>Scan interval (sec)</label>
+            <input type="number" id="sys-interval" min="1" />
+          </div>
+          <div class="col">
+            <label>Broadcast timeout (sec)</label>
+            <input type="number" id="sys-bcast" min="1" />
+          </div>
+          <div class="col">
+            <label>Per-IP timeout (sec)</label>
+            <input type="number" id="sys-indiv" min="1" />
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="title">Notification &amp; server</span></div>
+        <div class="row">
+          <div class="col">
+            <label>Re-notify interval (min)</label>
+            <input type="number" id="sys-absence" min="1" />
+            <div class="hint">After a device is absent longer than this, it notifies again when it reappears.</div>
+          </div>
+          <div class="col">
+            <label>HTTP port</label>
+            <input type="number" id="sys-port" min="1" max="65535" />
+            <div class="hint">Requires a service restart to take effect.</div>
+          </div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="save-system">Save system settings</button>
+      </div>
+    </section>
+
+    <!-- Status -->
+    <section id="view-status" class="view">
+      <div class="card">
+        <div class="card-head">
+          <span class="title">Device status</span>
+          <button class="btn secondary small" id="refresh-status">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>MAC</th><th>Last seen</th><th>Notified</th></tr>
+            </thead>
+            <tbody id="status-rows"></tbody>
+          </table>
+        </div>
+        <div id="status-empty" class="empty hidden">No detections yet.</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+
+  <!-- Template for a target card -->
+  <template id="tpl-target">
+    <div class="card target">
+      <div class="card-head">
+        <label class="switch">
+          <input type="checkbox" class="t-enabled" />
+          <span>Enabled</span>
+        </label>
+        <button class="btn danger small t-remove">Delete target</button>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label>Name</label>
+          <input type="text" class="t-name" placeholder="e.g. Mom's phone" />
+        </div>
+        <div class="col">
+          <label>MAC address</label>
+          <input type="text" class="t-mac" placeholder="aa:bb:cc:dd:ee:ff" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label>Detection mode</label>
+          <select class="t-mode">
+            <option value="auto">IP first, broadcast fallback (auto)</option>
+            <option value="ip">Probe IP only (ip)</option>
+            <option value="broadcast">Broadcast only (broadcast)</option>
+          </select>
+        </div>
+        <div class="col t-ip-wrap">
+          <label>IP address</label>
+          <input type="text" class="t-ip" placeholder="192.168.0.100" />
+        </div>
+      </div>
+      <label>Message for this target (empty = use default)</label>
+      <textarea class="t-message" placeholder="Empty = use default message"></textarea>
+
+      <div class="card-head" style="margin-top:16px;">
+        <span class="title" style="font-size:14px;">Receivers</span>
+        <div class="inline">
+          <button class="btn secondary small t-pick">Pick from recent</button>
+          <button class="btn secondary small t-add-receiver">+ Add manually</button>
+        </div>
+      </div>
+      <div class="receivers"></div>
+    </div>
+  </template>
+
+  <!-- Template for a receiver row -->
+  <template id="tpl-receiver">
+    <div class="receiver">
+      <div class="row">
+        <div class="col">
+          <label>Name (contact)</label>
+          <input type="text" class="r-name" placeholder="e.g. Mom" />
+        </div>
+        <div class="col">
+          <label>LINE ID</label>
+          <input type="text" class="r-id" placeholder="Uxxxxxxxx..." />
+        </div>
+      </div>
+      <label>Custom message (empty = use this target / default message)</label>
+      <textarea class="r-message"></textarea>
+      <div class="rid"></div>
+      <div class="inline" style="margin-top:8px;">
+        <button class="btn secondary small r-test">Send test</button>
+        <button class="btn danger small r-remove">Remove</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

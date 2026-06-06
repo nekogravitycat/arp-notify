@@ -21,55 +21,87 @@ sudo setcap cap_net_raw+ep /usr/sbin/arp-scan
 ## Build
 
 ```bash
-go build -o arp-notify ./cmd/arp-notify/main.go
+go build -o arp-notify ./cmd/arp-notify
 ```
 
 ## Configuration
 
-### Target Monitoring File
+Configuration lives in two YAML files in the working directory. They are created
+automatically from a template on first run — populate them (or use the web UI) and restart.
+Only the LINE secrets live in `.env`.
 
-Create a file named `monitor_targets.json`. Example:
+### `.env` (secrets only)
 
-```json
-{
-  "targets": [
-    {
-      "mac": "e0:0f:52:1b:b9:59",
-      "message": "A random mac address and a random receiver!",
-      "receivers": ["Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"]
-    },
-    {
-      "mac": "e0:0f:52:1b:b9:59",
-      "ip": "192.168.0.2",
-      "message": "With optional IP address.",
-      "receivers": ["Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"]
-    }
-  ]
-}
+```dotenv
+LINE_BOT_CHANNEL_ACCESS_TOKEN="..."
+LINE_BOT_CHANNEL_SECRET="..."
 ```
 
-- `mac`: The MAC address of the device to monitor.
-- `ip`: Optional IP address to probe when a broadcast ARP scan fails.
-- `message`: The notification message to send when the device is detected.
-- `receivers`: A list of LINE user IDs to receive the message.
+These may also be supplied directly by the environment (e.g. via systemd); the `.env` file is
+optional.
 
-### Environment Variables (`.env`)
+### `config.yaml` (system / scan behavior)
 
-Create a `.env` file with the following:
+```yaml
+arp_scan:
+  bin: arp-scan            # path to the arp-scan binary
+  iface: ""               # network interface; empty = all interfaces
+  interval_sec: 60         # how often to scan
+  broadcast_timeout_sec: 15
+  individual_timeout_sec: 2
+monitor:
+  absence_reset_min: 1440  # re-notify after a device has been absent this long (minutes)
+server:
+  port: 5000               # HTTP port for the LINE webhook and the /admin UI
+```
 
-#### Required
+### `targets.yaml` (what to watch + who to tell)
 
-- `LINE_BOT_CHANNEL_ACCESS_TOKEN`
-- `LINE_BOT_CHANNEL_SECRET`
+```yaml
+default_message: "Welcome home!"     # used when a target/receiver has no message
+contacts:                            # reusable LINE user -> friendly name registry
+  - id: "Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"
+    name: "Mom"
+targets:
+  - name: "Mom's phone"              # friendly label (UI + logs)
+    mac: "e0:0f:52:1b:b9:59"
+    enabled: true
+    detection:
+      mode: auto                     # ip | broadcast | auto
+      ip: "192.168.0.2"              # required for ip / auto
+    message: "Mom's home!"           # optional; overrides default_message
+    receivers:
+      - id: "Uufj4b2qnpmf3jj0pqj8xqz42ay1bbo8s"
+        message: "歡迎回家！"         # optional; overrides the target message
+```
 
-#### Optional (with defaults)
+- **Detection modes**
+  - `ip` — only individual-scan the configured IP.
+  - `broadcast` — only broadcast-scan and match the MAC in the output.
+  - `auto` — individual-scan the IP first, fall back to the broadcast scan.
+- **Message precedence:** `receiver.message` → `target.message` → `default_message`.
+- **Contacts** map a LINE user ID to a friendly name and are auto-filled from the LINE profile
+  the first time that user messages the bot.
 
-- `ARP_SCAN_BIN = "arp-scan"`
-- `ARP_SCAN_IFACE = ""`
-- `ARP_SCAN_INTERVAL_SECS = "60"`
-- `ARP_SCAN_BROADCAST_TIMEOUT_SECS = "15"`
-- `ARP_SCAN_INDIVIDUAL_TIMEOUT_SECS = "2"`
-- `MONITOR_ABSENCE_RESET_MIN = "1440"`
+## Web UI
+
+The service serves a configuration UI at `http://<host>:<port>/admin/` (default
+`http://localhost:5000/admin/`) on the same port as the LINE webhook. From there you can:
+
+- edit targets, detection modes, messages and receivers;
+- pick receivers from the list of users who recently messaged the bot (with their LINE names);
+- send a test notification to verify a receiver ID;
+- view live device status (last seen / notified);
+- adjust system settings.
+
+Changes are saved to the YAML files and take effect **immediately, without a restart** (a
+changed `server.port` is the one exception and needs a restart). The UI has **no
+authentication** — only expose the port on a trusted network.
+
+### Finding a LINE user ID
+
+Have the person send the bot any message; they will appear in the **"Pick from recent"** picker.
+Sending `whoami` makes the bot reply with the raw user ID.
 
 ## Run
 
@@ -77,7 +109,8 @@ Create a `.env` file with the following:
 ./arp-notify
 ```
 
-The program will periodically run `arp-scan` to detect target devices and send LINE Bot notifications when matches are found.
+The program periodically runs `arp-scan` to detect target devices and sends LINE Bot
+notifications when matches are found.
 
 ## Autostart on Linux (systemd)
 
