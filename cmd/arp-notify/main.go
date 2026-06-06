@@ -46,7 +46,7 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	log.Printf("Starting server on %s (admin UI at /admin/)", addr)
+	log.Printf("Starting server on %s", addr)
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}

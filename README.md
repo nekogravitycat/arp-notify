@@ -130,3 +130,28 @@ A systemd service file `arp-notify.service` is included in the repository. To us
     ```bash
     sudo systemctl status arp-notify
     ```
+
+## Updating
+
+To deploy a newer version when running under systemd:
+
+1.  **Stop the service**:
+    ```bash
+    sudo systemctl stop arp-notify
+    ```
+2.  **Pull and rebuild** in the project directory:
+    ```bash
+    cd /path/to/arp-notify
+    git pull
+    go build -o arp-notify ./cmd/arp-notify
+    ```
+3.  **Restart and verify**:
+    ```bash
+    sudo systemctl start arp-notify
+    sudo systemctl status arp-notify
+    journalctl -u arp-notify -f
+    ```
+
+Your `.env`, `config.yaml` and `targets.yaml` are left untouched. If you build on a
+different machine, copy the resulting `arp-notify` binary over the old one and restart
+the service instead of running `git pull && go build` on the server.

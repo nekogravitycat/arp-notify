@@ -17,10 +17,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	}
 	fileServer := http.FileServer(http.FS(sub))
 
-	mux.Handle("/admin/", http.StripPrefix("/admin/", fileServer))
-	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
-	})
+	mux.Handle("/", fileServer)
 
 	mux.HandleFunc("/api/system", handleSystem)
 	mux.HandleFunc("/api/targets", handleTargets)
